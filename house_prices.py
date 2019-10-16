@@ -3,8 +3,11 @@ Tools for tracking and predicting UK residential property values, based on data 
 """
 
 import csv
+from datetime import datetime as dt
 import os
 import sqlite3
+
+import matplotlib.pyplot as plt
 
 class Prop:
     """
@@ -33,6 +36,22 @@ class Prop:
 
         # TODO: implement predictive model and return predicted value instead
         self.predicted_value = 0
+
+
+def chart_sales():
+    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
+    conn = create_connection(db_path)
+    cur = conn.cursor()
+    sales = cur.execute("""SELECT transaction_amount, transaction_date 
+                           FROM ppd 
+                           WHERE property_type = 'D' AND town_city = 'BRISTOL' """).fetchall()
+    x_vals, y_vals = [], []
+    for sale in sales:
+        y_vals.append(sale[0])
+        x_vals.append(dt.strptime(sale[1], "%Y-%m-%d %H:%M"))
+
+    plt.scatter(x_vals, y_vals)
+    plt.show()
 
 
 def create_connection(db_file):
@@ -134,4 +153,5 @@ def validate_new_data():
 
 if __name__ == '__main__':
     # load_initial_data()
-    select_rows(10)
+    # select_rows(10)
+    chart_sales()
