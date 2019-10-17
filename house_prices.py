@@ -8,6 +8,9 @@ import os
 import sqlite3
 
 import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
+
 
 class Prop:
     """
@@ -36,6 +39,30 @@ class Prop:
 
         # TODO: implement predictive model and return predicted value instead
         self.predicted_value = 0
+
+
+def avg_value_by_month_and_type(month, prop_type):
+    """
+    Calculates average sale price for a given property type and month.
+    :param month: 7 character string in format yyyy-mm
+    :param prop_type: single letter corresponding to Land Registry property type (D, S, T, F, O)
+    :return: average value as float
+    """
+    if prop_type not in 'DSTFO':
+        print("Property type must be one of D, S, T, F and O.")
+        return -1
+
+    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
+    conn = create_connection(db_path)
+    cur = conn.cursor()
+    criteria = (f'{month}%',)
+    sales = cur.execute("""SELECT property_type, transaction_amount
+                         FROM ppd 
+                         WHERE transaction_date LIKE ?
+                         ;""", criteria).fetchall()
+    data = pd.DataFrame(sales, columns=['property_type', 'transaction_amount'])
+    print(data.groupby('property_type').agg(['count', 'mean']))
+    return data
 
 
 def chart_sales():
@@ -154,4 +181,5 @@ def validate_new_data():
 if __name__ == '__main__':
     # load_initial_data()
     # select_rows(10)
-    chart_sales()
+    # chart_sales()
+    avg_value_by_month_and_type("2019-08", 'D')
