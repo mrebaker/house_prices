@@ -10,6 +10,7 @@ import sqlite3
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
+from scipy import stats
 
 
 class Prop:
@@ -43,7 +44,7 @@ class Prop:
 
 def avg_value_by_month_and_type(month, prop_type):
     """
-    Calculates average sale price for a given property type and month.
+    Calculates geometric mean of sale price for a given property type and month.
     :param month: 7 character string in format yyyy-mm
     :param prop_type: single letter corresponding to Land Registry property type (D, S, T, F, O)
     :return: average value as float
@@ -55,14 +56,15 @@ def avg_value_by_month_and_type(month, prop_type):
     db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
     conn = create_connection(db_path)
     cur = conn.cursor()
-    criteria = (f'{month}%',)
-    sales = cur.execute("""SELECT property_type, transaction_amount
+    criteria = (f'{month}%', prop_type)
+    sales = cur.execute("""SELECT transaction_amount
                          FROM ppd 
                          WHERE transaction_date LIKE ?
+                         AND property_type = ?
                          ;""", criteria).fetchall()
-    data = pd.DataFrame(sales, columns=['property_type', 'transaction_amount'])
-    print(data.groupby('property_type').agg(['count', 'mean']))
-    return data
+
+    g_mean = stats.gmean(sales)
+    return g_mean
 
 
 def chart_sales():
