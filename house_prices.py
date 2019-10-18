@@ -73,7 +73,8 @@ def chart_sales():
     cur = conn.cursor()
     sales = cur.execute("""SELECT transaction_amount, transaction_date 
                            FROM ppd 
-                           WHERE property_type = 'D' AND town_city = 'BRISTOL' """).fetchall()
+                           WHERE property_type = 'D' 
+                           AND town_city = 'BRISTOL' """).fetchall()
     x_vals, y_vals = [], []
     for sale in sales:
         y_vals.append(sale[0])
@@ -149,7 +150,8 @@ def load_initial_data():
         print(to_db[0])
 
         cur = conn.cursor()
-        insert_template = f"INSERT INTO ppd ({', '.join(field_names)}) VALUES ({', '.join(['?']*len(field_names))});"
+        insert_template = f"""INSERT INTO ppd ({', '.join(field_names)})
+                              VALUES ({', '.join(['?']*len(field_names))});"""
         print(insert_template)
         cur.executemany(insert_template, to_db)
         conn.commit()
@@ -163,13 +165,14 @@ def load_new_data():
     """
 
 
-def select_rows(limit):
+def select_rows():
     db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
     conn = create_connection(db_path)
     cur = conn.cursor()
-    for row in cur.execute("""SELECT postcode, transaction_amount, transaction_date 
+    rows = cur.execute("""SELECT postcode, transaction_amount, transaction_date 
                               FROM ppd 
-                              WHERE property_type = 'F' AND transaction_amount >= 1000000"""):
+                              WHERE property_type = 'F' AND transaction_amount >= 1000000""")
+    for row in rows:
         print(row)
 
 
@@ -182,6 +185,6 @@ def validate_new_data():
 
 if __name__ == '__main__':
     # load_initial_data()
-    # select_rows(10)
+    # select_rows()
     # chart_sales()
     avg_value_by_month_and_type("2019-08", 'D')
