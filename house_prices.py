@@ -278,21 +278,27 @@ def select_rows(tbl):
 
 
 def set_address_id_in_ppd():
-    select_query = """SELECT ppd.paon, address.id
+    select_query = """SELECT address.id, ppd.id
                       FROM ppd 
-                      LEFT JOIN address on (ppd.postcode = address.postcode,
-                      ppd.paon = address.paon,
-                      ppd.saon = address.saon ,
-                      ppd.street = address.street ,
-                      ppd.locality = address.locality,
-                      ppd.town_city = address.town_city,
-                      ppd.district = address.district,
+                      LEFT JOIN address on (ppd.postcode = address.postcode and
+                      ppd.paon = address.paon and
+                      ppd.saon = address.saon and
+                      ppd.street = address.street and
+                      ppd.locality = address.locality and
+                      ppd.town_city = address.town_city and
+                      ppd.district = address.district and
                       ppd.county = address.county);"""
     conn = create_connection(DB_PATH)
     cur = conn.cursor()
-    rows = cur.execute(select_query).fetchmany(10)
+    rows = cur.execute(select_query).fetchall()
+
+    update_template = """UPDATE ppd SET fk_address_id = ?
+                         WHERE id = ?;"""
     for row in rows:
-        print(row)
+        cur.execute(update_template, row)
+
+    conn.commit()
+    conn.close()
 
 
 def validate_new_data():
