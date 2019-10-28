@@ -4,6 +4,7 @@ Tools for tracking and predicting UK residential property values, based on data 
 
 import csv
 from datetime import datetime as dt
+from dateutil.relativedelta import relativedelta
 import os
 import sqlite3
 
@@ -12,6 +13,8 @@ import numpy as np
 import pandas as pd
 from scipy import stats
 
+
+DB_PATH = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db") 
 
 class Prop:
     """
@@ -53,8 +56,7 @@ def avg_value_by_month_and_type(month, prop_type):
         print("Property type must be one of D, S, T, F and O.")
         return -1
 
-    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
-    conn = create_connection(db_path)
+    conn = create_connection(DB_PATH)
     cur = conn.cursor()
     criteria = (f'{month}%', prop_type)
     sales = cur.execute("""SELECT transaction_amount
@@ -67,9 +69,48 @@ def avg_value_by_month_and_type(month, prop_type):
     return g_mean
 
 
+def avg_price_history():
+    conn = create_connection(DB_PATH)
+    cur = conn.cursor()
+
+    dates = cur.execute("""SELECT transaction_date 
+                           FROM ppd  
+                           ORDER BY transaction_date asc""").fetchall()
+
+    min_date = dt.strptime(dates[0][0], "%Y-%m-%d %H:%M").replace(day=1)
+    max_date = dt.strptime(dates[-1][0], "%Y-%m-%d %H:%M").replace(day=1)
+
+    date = min_date
+    month_list = []
+    while date <= max_date:
+        month_list.append(date.strftime("%Y-%m"))
+        date = date + relativedelta(months=1)
+
+    sales = cur.execute("""SELECT transaction_date, property_type, transaction_amount
+                             FROM ppd;""").fetchall()
+    df_sales = pd.DataFrame(sales, columns=['transaction_date', 'property_type', 'transaction_amount'])
+
+    history = {}
+    for month in month_list:
+        avg_prices = {}
+        df_sales_month = df_sales[df_sales['transaction_date'].str.contains(month)]
+        for prop_type in 'DSTF':
+            df_values = df_sales_month[df_sales_month['property_type'] == prop_type]
+            g_mean = stats.gmean(df_values['transaction_amount'])
+            avg_prices[prop_type] = g_mean
+        history[month] = avg_prices
+
+    with open('avg_price_history.csv', 'w+') as f:
+        # field_names = ['month', 'property_type', 'average_price']
+        writer = csv.writer(f)
+        for k, v in history.items():
+            row = [k, v['D'], v['S'], v['T'], v['F']]
+            print(row)
+            writer.writerow(row)
+
+
 def chart_sales():
-    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
-    conn = create_connection(db_path)
+    conn = create_connection(DB_PATH)
     cur = conn.cursor()
     sales = cur.execute("""SELECT transaction_amount, transaction_date 
                            FROM ppd 
@@ -83,6 +124,22 @@ def chart_sales():
     plt.scatter(x_vals, y_vals)
     plt.show()
 
+
+def chart_avg_prices():
+    with open('avg_price_history.csv', 'r') as f:
+        df = pd.read_csv(f, names=['month', 'D', 'S', 'T', 'F'])
+
+    df['month'] += '-01'
+    ax1 = df.plot()
+    tick_count = len(ax1.get_xticklabels())
+    month_count = len(df['month'])
+    label_spacing = month_count // tick_count
+    new_ticks = []
+    for x in range(tick_count):
+        new_ticks.append(df['month'][x * label_spacing])
+    print(new_ticks)
+    ax1.set_xticklabels(new_ticks)
+    plt.show()
 
 def create_connection(db_file):
     conn = None
@@ -107,13 +164,43 @@ def create_table(conn, create_table_sql):
         print(e)
 
 
+def create_property_id_table():
+    create_table_query = """CREATE TABLE IF NOT EXISTS address (
+                      id integer PRIMARY KEY,
+                      postcode text,
+                      paon text, 
+                      saon text, 
+                      street text, 
+                      locality text, 
+                      town_city text, 
+                      district text, 
+                      county text
+                      );"""
+
+    insert_query = """INSERT INTO address
+                      SELECT NULL, postcode, paon, saon, street, locality, town_city, district, county
+                      FROM ppd
+                      GROUP BY postcode, paon, saon, street, locality, town_city, district, county; """
+
+    conn = create_connection(DB_PATH)
+
+    if conn is not None:
+        create_table(conn, create_table_query)
+    else:
+        print("Error: cannot create the database connection.")
+
+    cur = conn.cursor()
+    cur.execute(insert_query).fetchall()
+    conn.commit()
+    conn.close()
+
+    
 def load_initial_data():
     """
     Takes Land Registry price data from a text file and creates a database from it.
     :return:
     """
     data_path = os.path.normpath("F:/Databases/hmlr_pp_complete.txt")
-    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
     sql_create_ppd_table = """ CREATE TABLE IF NOT EXISTS ppd (
                                         id integer PRIMARY KEY,
                                         guid text NOT NULL,
@@ -131,10 +218,11 @@ def load_initial_data():
                                         district text,
                                         county text,
                                         transaction_category text,
-                                        record_status text
+                                        record_status text,
+                                        fk_address_id integer
                                     ); """
 
-    conn = create_connection(db_path)
+    conn = create_connection(DB_PATH)
     if conn is not None:
         create_table(conn, sql_create_ppd_table)
     else:
@@ -165,13 +253,44 @@ def load_new_data():
     """
 
 
-def select_rows():
-    db_path = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db")
-    conn = create_connection(db_path)
+def select_rows(tbl):
+    """
+    Executes hardcoded SQL queries for testing purposes.
+    :param tbl: a single letter indicating the table to query
+    :return: -1 on fail, 0 otherwise
+    """
+    conn = create_connection(DB_PATH)
     cur = conn.cursor()
-    rows = cur.execute("""SELECT postcode, transaction_amount, transaction_date 
-                              FROM ppd 
-                              WHERE property_type = 'F' AND transaction_amount >= 1000000""")
+
+    if tbl == 'a':
+        query = """SELECT * 
+                   FROM address;"""
+    elif tbl == 'p':
+        query = """SELECT postcode, transaction_amount, transaction_date 
+                   FROM ppd 
+                   WHERE property_type = 'F' AND transaction_amount >= 1000000"""
+    else:
+        return -1
+
+    rows = cur.execute(query).fetchall()
+    for row in rows:
+        print(row)
+
+
+def set_address_id_in_ppd():
+    select_query = """SELECT ppd.paon, address.id
+                      FROM ppd 
+                      LEFT JOIN address on (ppd.postcode = address.postcode,
+                      ppd.paon = address.paon,
+                      ppd.saon = address.saon ,
+                      ppd.street = address.street ,
+                      ppd.locality = address.locality,
+                      ppd.town_city = address.town_city,
+                      ppd.district = address.district,
+                      ppd.county = address.county);"""
+    conn = create_connection(DB_PATH)
+    cur = conn.cursor()
+    rows = cur.execute(select_query).fetchmany(10)
     for row in rows:
         print(row)
 
@@ -185,6 +304,10 @@ def validate_new_data():
 
 if __name__ == '__main__':
     # load_initial_data()
-    # select_rows()
+    # create_property_id_table()
+    # select_rows('p')
     # chart_sales()
-    avg_value_by_month_and_type("2019-08", 'D')
+    # avg_value_by_month_and_type("2019-08", 'D')
+    # avg_price_history()
+    # chart_avg_prices()
+    set_address_id_in_ppd()
