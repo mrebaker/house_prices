@@ -16,6 +16,7 @@ from scipy import stats
 
 DB_PATH = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db") 
 
+
 class Prop:
     """
     A residential property in the UK, based on info both from Land Registry and privately held.
@@ -141,6 +142,7 @@ def chart_avg_prices():
     ax1.set_xticklabels(new_ticks)
     plt.show()
 
+
 def create_connection(db_file):
     conn = None
     try:
@@ -251,6 +253,77 @@ def load_new_data():
     Takes Land Registry price data for a single month and updates the database with it.
     :return:
     """
+    # TODO
+
+
+def load_ruc_data():
+    """
+        Takes Land Registry price data from a text file and creates a database from it.
+        :return:
+        """
+    data_path = os.path.normpath("F:/Databases/hmlr_pp_complete.txt")
+    sql_create_ppd_table = """ CREATE TABLE IF NOT EXISTS ppd (
+                                            id integer PRIMARY KEY,
+                                            guid text NOT NULL,
+                                            transaction_amount integer,
+                                            transaction_date text,
+                                            postcode text,
+                                            property_type text,
+                                            new_build text,
+                                            tenure text,
+                                            paon text,
+                                            saon text,
+                                            street text,
+                                            locality text,
+                                            town_city text,
+                                            district text,
+                                            county text,
+                                            transaction_category text,
+                                            record_status text,
+                                            fk_address_id integer
+                                        ); """
+
+    conn = create_connection(DB_PATH)
+    if conn is not None:
+        create_table(conn, sql_create_ppd_table)
+    else:
+        print("Error: cannot create the database connection.")
+
+    with open(data_path, 'r') as f:
+        field_names = ['guid', 'transaction_amount', 'transaction_date', 'postcode',
+                       'property_type', 'new_build', 'tenure', 'paon',
+                       'saon', 'street', 'locality', 'town_city',
+                       'district', 'county', 'transaction_category', 'record_status']
+        dr = csv.DictReader(f, fieldnames=field_names)
+        to_db = [tuple([row[field] for field in field_names]) for row in dr]
+        print(to_db[0])
+
+        cur = conn.cursor()
+        insert_template = f"""INSERT INTO ppd ({', '.join(field_names)})
+                                  VALUES ({', '.join(['?']*len(field_names))});"""
+        print(insert_template)
+        cur.executemany(insert_template, to_db)
+        conn.commit()
+        conn.close()
+
+
+def run_query(columns, where, limit):
+    """
+    Helper to execute queries on the database - intended for use by the predictions model.
+    :return:
+    """
+    conn = create_connection(DB_PATH)
+    cur = conn.cursor()
+    query = f"""SELECT {','.join(columns)}
+                FROM ppd
+                WHERE {where}"""
+    print(query)
+    if limit == 0:
+        data = cur.execute(query).fetchall()
+    else:
+        data = cur.execute(query).fetchmany(limit)
+
+    return data
 
 
 def select_rows(tbl):
@@ -310,10 +383,11 @@ def validate_new_data():
 
 if __name__ == '__main__':
     # load_initial_data()
+    load_ruc_data()
     # create_property_id_table()
     # select_rows('p')
     # chart_sales()
     # avg_value_by_month_and_type("2019-08", 'D')
     # avg_price_history()
     # chart_avg_prices()
-    set_address_id_in_ppd()
+    # set_address_id_in_ppd()
