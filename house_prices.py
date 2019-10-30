@@ -57,7 +57,7 @@ def avg_value_by_month_and_type(month, prop_type):
         print("Property type must be one of D, S, T, F and O.")
         return -1
 
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
     criteria = (f'{month}%', prop_type)
     sales = cur.execute("""SELECT transaction_amount
@@ -71,7 +71,7 @@ def avg_value_by_month_and_type(month, prop_type):
 
 
 def avg_price_history():
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
 
     dates = cur.execute("""SELECT transaction_date 
@@ -111,7 +111,7 @@ def avg_price_history():
 
 
 def chart_sales():
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
     sales = cur.execute("""SELECT transaction_amount, transaction_date 
                            FROM ppd 
@@ -143,10 +143,10 @@ def chart_avg_prices():
     plt.show()
 
 
-def create_connection(db_file):
+def create_connection():
     conn = None
     try:
-        conn = sqlite3.connect(db_file)
+        conn = sqlite3.connect(DB_PATH)
         return conn
     except sqlite3.Error as e:
         print(e)
@@ -184,7 +184,7 @@ def create_property_id_table():
                       FROM ppd
                       GROUP BY postcode, paon, saon, street, locality, town_city, district, county; """
 
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
 
     if conn is not None:
         create_table(conn, create_table_query)
@@ -196,7 +196,17 @@ def create_property_id_table():
     conn.commit()
     conn.close()
 
-    
+
+def get_postcode_areas():
+    conn = create_connection()
+    cur = conn.cursor()
+    query = f"""SELECT DISTINCT postcode
+                FROM ppd"""
+
+    pc_list = cur.execute(query).fetchall()
+    pca_list = []
+
+
 def load_initial_data():
     """
     Takes Land Registry price data from a text file and creates a database from it.
@@ -224,7 +234,7 @@ def load_initial_data():
                                         fk_address_id integer
                                     ); """
 
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     if conn is not None:
         create_table(conn, sql_create_ppd_table)
     else:
@@ -269,7 +279,7 @@ def load_oapcs_data():
                                                 ObjectId integer
                                             ); """
 
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     if conn is not None:
         create_table(conn, sql_create_ppd_table)
     else:
@@ -306,7 +316,7 @@ def load_ruc_data():
                                             ASSIGN_CHREASON text
                                         ); """
 
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     if conn is not None:
         create_table(conn, sql_create_ppd_table)
     else:
@@ -318,10 +328,10 @@ def load_ruc_data():
         to_db = [tuple([row[field] for field in field_names]) for row in dr]
         print(to_db[0])
 
-        cur = conn.cursor()
         insert_template = f"""INSERT INTO ruc ({', '.join(field_names)})
                                   VALUES ({', '.join(['?']*len(field_names))});"""
         print(insert_template)
+        cur = conn.cursor()
         cur.executemany(insert_template, to_db)
         conn.commit()
         conn.close()
@@ -332,12 +342,12 @@ def run_query(columns, where, limit):
     Helper to execute queries on the database - intended for use by the predictions model.
     :return:
     """
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
     query = f"""SELECT {','.join(columns)}
                 FROM ppd
                 WHERE {where}"""
-    print(query)
+
     if limit == 0:
         data = cur.execute(query).fetchall()
     else:
@@ -352,7 +362,7 @@ def select_rows(tbl):
     :param tbl: a single letter indicating the table to query
     :return: -1 on fail, 0 otherwise
     """
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
 
     if tbl == 'a':
@@ -381,7 +391,7 @@ def set_address_id_in_ppd():
                       ppd.town_city = address.town_city and
                       ppd.district = address.district and
                       ppd.county = address.county);"""
-    conn = create_connection(DB_PATH)
+    conn = create_connection()
     cur = conn.cursor()
     rows = cur.execute(select_query).fetchall()
 
