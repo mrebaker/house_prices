@@ -25,20 +25,7 @@ def create_model(model_type):
         print(f'{model_type} is not a supported type of model.')
         return -2
 
-    # TODO model data is currently hardcoded - this should be made flexible
-    cols = ['transaction_date', 'transaction_amount']
-    where = 'property_type = "F"'
-    data = hp.run_query(cols, where, 0)
-    df = pd.DataFrame(data, columns=cols)
-
-    df['transaction_date'] = df['transaction_date'].astype('datetime64[D]')
-    d1 = datetime(1995, 1, 1)
-    df['tx_day'] = (df['transaction_date'] - d1).dt.days
-
-    # high value filter
-    df = df[df['transaction_amount'] < 10 ** 6]
-    X = df['tx_day'][:, None],
-    y = df['transaction_amount'][:, None]
+    X, y = get_model_data()
 
     X_train, X_test, y_train, y_test = train_test_split(X,
                                                         y,
@@ -51,15 +38,18 @@ def create_model(model_type):
     print(f"""New model created:
               yhat = {lm.intercept_[0]} + x*{lm.coef_[0][0]}')
               R^2 = {lm.score(X_test, y_test)}""")
-    pickled_model = pickle.dumps(lm)
-    insert_query = """INSERT INTO models (type, date_created, model_obj) 
-                      VALUES (?, ?, ?)"""
 
-    conn = hp.create_connection(DB_PATH)
+    # pickle, and store in database
+    pickled_model = pickle.dumps(lm)
+    insert_query = """INSERT INTO model (type, date_created, model_obj) 
+                      VALUES (?, ?, ?)"""
+    insert_details = (model_type, datetime.today(), pickled_model)
+    conn = hp.create_connection()
     cur = conn.cursor()
-    cur.executemany(insert_template, to_db)
+    cur.execute(insert_query, insert_details)
     conn.commit()
     conn.close()
+
     return lm
 
 
@@ -69,6 +59,47 @@ def fetch_model(model_type):
     :param model_type:
     :return:
     """
+
+    select_query = """SELECT model_obj
+                      FROM model 
+                      WHERE type = ?"""
+
+    conn = hp.create_connection()
+    cur = conn.cursor()
+    result = cur.execute(select_query, (model_type,)).fetchall()
+    conn.close()
+
+    # todo: allow finer selection than this currently does
+    # todo: check that no hits are returned as zero-length list, not None
+    if len(result) == 0:
+        print("Warning: No models meet your criteria.")
+        return None
+
+    elif len(result) > 1:
+        print("Warning: Multiple models meet your criteria. The first hit has been selected automatically.")
+
+    pickle_obj = result[0][0]
+    return pickle.loads(pickle_obj)
+
+
+def get_model_data():
+    # todo: model data is currently hardcoded - this should be made flexible
+    # todo: should model data be an object?
+    cols = ['transaction_date', 'transaction_amount']
+    where = 'property_type = "F"'
+    data = hp.run_query(cols, where, 100)
+    df = pd.DataFrame(data, columns=cols)
+
+    df['transaction_date'] = df['transaction_date'].astype('datetime64[D]')
+    d1 = datetime(1995, 1, 1)
+    df['tx_day'] = (df['transaction_date'] - d1).dt.days
+
+    # high value filter
+    df = df[df['transaction_amount'] < 10 ** 6]
+    X = df['tx_day'][:, None]
+    y = df['transaction_amount'][:, None]
+
+    return X, y
 
 
 def run_model(model_type):
@@ -124,14 +155,22 @@ def run_slr(force_new):
     """
 
     if force_new:
-        lm = create_model('slr', )
+        lm = create_model('slr')
     else:
         lm = fetch_model('slr')
         if lm is None:
-            slr_model = create_model('slr')
+            print("No model returned - creating a new one.")
+            lm = create_model('slr')
+
+    X, y = get_model_data()
+
+    # todo: should do more than just print the details and the R^2
+    print(f"""Running the requested model:
+              yhat = {lm.intercept_[0]} + x*{lm.coef_[0][0]}')
+              R^2 = {lm.score(X, y)}""")
 
 
 if __name__ == '__main__':
     # pca_list = hp.get_postcode_areas()
     run_slr(False)
-    run_pr()
+    # run_pr()
