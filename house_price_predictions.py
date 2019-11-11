@@ -87,7 +87,7 @@ def get_model_data():
     # todo: should model data be an object?
     cols = ['transaction_date', 'transaction_amount']
     where = 'property_type = "F"'
-    data = hp.run_query(cols, where, 100)
+    data = hp.run_query(cols, where, 0)
     df = pd.DataFrame(data, columns=cols)
 
     df['transaction_date'] = df['transaction_date'].astype('datetime64[D]')
@@ -148,7 +148,7 @@ def run_pr():
     # plt.show()
 
 
-def run_slr(force_new):
+def run_slr(force_new=False):
     """
     Basic single linear regression between time and property price.
     :return:
@@ -172,5 +172,5 @@ def run_slr(force_new):
 
 if __name__ == '__main__':
     # pca_list = hp.get_postcode_areas()
-    run_slr(False)
+    run_slr(force_new=False)
     # run_pr()
