@@ -2,19 +2,21 @@
 Tools for tracking and predicting UK residential property values, based on data from Land Registry.
 """
 
+# standard imports
 import csv
 from datetime import datetime as dt
-from dateutil.relativedelta import relativedelta
-import os
+from pathlib import Path
 import sqlite3
 
+# third-party imports
+from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 from scipy import stats
 
 
-DB_PATH = os.path.normpath("F:/Databases/hmlr_pp/hmlr_pp.db") 
+DB_PATH = Path('F:/Databases/hmlr_pp/hmlr_pp.db')
 
 
 class Prop:
@@ -212,7 +214,7 @@ def load_initial_data():
     Takes Land Registry price data from a text file and creates a database from it.
     :return:
     """
-    data_path = os.path.normpath("F:/Databases/hmlr_pp_complete.txt")
+
     sql_create_ppd_table = """ CREATE TABLE IF NOT EXISTS ppd (
                                         id integer PRIMARY KEY,
                                         guid text NOT NULL,
@@ -240,6 +242,7 @@ def load_initial_data():
     else:
         print("Error: cannot create the database connection.")
 
+    data_path = Path('F:/Databases/hmlr_pp_complete.txt')
     with open(data_path, 'r') as f:
         field_names = ['guid', 'transaction_amount', 'transaction_date', 'postcode',
                        'property_type', 'new_build', 'tenure', 'paon',
@@ -271,7 +274,7 @@ def load_oapcs_data():
     Loads the output area to postcode sector mappings into the database.
     :return:
     """
-    data_path = os.path.normpath("F:/Databases/hmlr_pp/OC_PCS_2011_EW.csv")
+    data_path = Path('F:/Databases/hmlr_pp/OC_PCS_2011_EW.csv')
     sql_create_ppd_table = """ CREATE TABLE IF NOT EXISTS oapcs (
                                                 id integer PRIMARY KEY,
                                                 OA11CD text,
@@ -305,7 +308,7 @@ def load_ruc_data():
     Loads the rural-urban classification data into the database.
     :return:
     """
-    data_path = os.path.normpath("F:/Databases/hmlr_pp/RUC11_OA11_EW.csv")
+    data_path = Path('F:/Databases/hmlr_pp/RUC11_OA11_EW.csv')
     sql_create_ppd_table = """ CREATE TABLE IF NOT EXISTS ruc (
                                             id integer PRIMARY KEY,
                                             OA11CD text,
@@ -413,11 +416,11 @@ def validate_new_data():
 
 if __name__ == '__main__':
     # load_initial_data()
-    load_oapcs_data()
+    # load_oapcs_data()
     # create_property_id_table()
     # select_rows('p')
     # chart_sales()
-    # avg_value_by_month_and_type("2019-08", 'D')
+    avg_value_by_month_and_type("2019-08", 'D')
     # avg_price_history()
     # chart_avg_prices()
     # set_address_id_in_ppd()
