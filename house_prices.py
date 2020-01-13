@@ -260,9 +260,9 @@ def load_initial_data():
     conn.commit()
 
     # can't reasonably index transaction_date, so add transaction_month and index that instead
-    conn.execute('ALTER TABLE ppd ADD transaction_month TEXT;')
-    conn.execute('UPDATE ppd SET transaction_month = SUBSTR(transaction_date, 1, 7);')
-    conn.execute('CREATE INDEX transaction_month_index ON ppd(transaction_month);')
+    conn.execute("""ALTER TABLE ppd ADD transaction_month TEXT;
+                    UPDATE ppd SET transaction_month = SUBSTR(transaction_date, 1, 7);
+                    CREATE INDEX transaction_month_index ON ppd(transaction_month);""")
     conn.commit()
 
     conn.close()
