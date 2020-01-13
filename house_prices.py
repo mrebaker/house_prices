@@ -249,16 +249,23 @@ def load_initial_data():
                        'saon', 'street', 'locality', 'town_city',
                        'district', 'county', 'transaction_category', 'record_status']
         dr = csv.DictReader(f, fieldnames=field_names)
-        to_db = [tuple([row[field] for field in field_names]) for row in dr]
-        print(to_db[0])
+    to_db = [tuple([row[field] for field in field_names]) for row in dr]
+    print(to_db[0])
 
-        cur = conn.cursor()
-        insert_template = f"""INSERT INTO ppd ({', '.join(field_names)})
-                              VALUES ({', '.join(['?']*len(field_names))});"""
-        print(insert_template)
-        cur.executemany(insert_template, to_db)
-        conn.commit()
-        conn.close()
+    cur = conn.cursor()
+    insert_template = f"""INSERT INTO ppd ({', '.join(field_names)})
+                          VALUES ({', '.join(['?']*len(field_names))});"""
+    print(insert_template)
+    cur.executemany(insert_template, to_db)
+    conn.commit()
+
+    # can't reasonably index transaction_date, so add transaction_month and index that instead
+    conn.execute('ALTER TABLE ppd ADD transaction_month TEXT;')
+    conn.execute('UPDATE ppd SET transaction_month = SUBSTR(transaction_date, 1, 7);')
+    conn.execute('CREATE INDEX transaction_month_index ON ppd(transaction_month);')
+    conn.commit()
+
+    conn.close()
 
 
 def load_new_data():
