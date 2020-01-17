@@ -9,7 +9,6 @@ from pathlib import Path
 import sqlite3
 
 # third-party imports
-from dateutil.relativedelta import relativedelta
 import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
@@ -76,40 +75,15 @@ def avg_price_history():
     conn = create_connection()
     cur = conn.cursor()
 
-    dates = cur.execute("""SELECT transaction_date 
-                           FROM ppd  
-                           ORDER BY transaction_date asc""").fetchall()
-
-    min_date = dt.strptime(dates[0][0], "%Y-%m-%d %H:%M").replace(day=1)
-    max_date = dt.strptime(dates[-1][0], "%Y-%m-%d %H:%M").replace(day=1)
-
-    date = min_date
-    month_list = []
-    while date <= max_date:
-        month_list.append(date.strftime("%Y-%m"))
-        date = date + relativedelta(months=1)
-
     sales = cur.execute("""SELECT transaction_date, property_type, transaction_amount
-                             FROM ppd;""").fetchall()
+                             FROM ppd
+                             ;""").fetchall()
     df_sales = pd.DataFrame(sales, columns=['transaction_date', 'property_type', 'transaction_amount'])
-
-    history = {}
-    for month in month_list:
-        avg_prices = {}
-        df_sales_month = df_sales[df_sales['transaction_date'].str.contains(month)]
-        for prop_type in 'DSTF':
-            df_values = df_sales_month[df_sales_month['property_type'] == prop_type]
-            g_mean = stats.gmean(df_values['transaction_amount'])
-            avg_prices[prop_type] = g_mean
-        history[month] = avg_prices
-
-    with open('avg_price_history.csv', 'w+') as f:
-        # field_names = ['month', 'property_type', 'average_price']
-        writer = csv.writer(f)
-        for k, v in history.items():
-            row = [k, v['D'], v['S'], v['T'], v['F']]
-            print(row)
-            writer.writerow(row)
+    df_sales['transaction_date'] = pd.to_datetime(df_sales['transaction_date'])
+    df_sales['transaction_month'] = df_sales['transaction_date'].dt.strftime('%Y-%m')
+    df_sales = df_sales.drop('transaction_date', axis=1)
+    summary = df_sales.groupby(['transaction_month', 'property_type']).agg(stats.gmean)
+    summary.to_csv('avg_price_history_fast.csv')
 
 
 def chart_sales():
@@ -427,7 +401,7 @@ if __name__ == '__main__':
     # create_property_id_table()
     # select_rows('p')
     # chart_sales()
-    avg_value_by_month_and_type("2019-08", 'D')
-    # avg_price_history()
+    # avg_value_by_month_and_type("2019-08", 'D')
+    avg_price_history()
     # chart_avg_prices()
     # set_address_id_in_ppd()
